@@ -82,7 +82,7 @@ app.get("/", function(req, res, next) {
     //     });
     // };
 
-    // 爬取各区块全部页数url
+    // 爬取各区块全部页数
     var fetchUrl = function(myurl, callback) {
       var fetchStart = new Date().getTime();
       concurrencyCount++;
@@ -131,12 +131,85 @@ app.get("/", function(req, res, next) {
         fetchUrl(myurl, callback);
       },
       function(err, result) {
-        // 爬虫结束后的回调，可以做一些统计结果
         //爬取全部页面url结束后，对各页面url数组二次爬取房源信息
-        console.log("抓包结束，一共抓取了-->" + urlArr.length + "条数据");
-        console.log("urlPage", urlPage);
-        urlArr = []; //清空url数组
-        return false;
+        // 爬取房源信息
+        var concurrencyCount1 = 0;
+        var num1 = -5; //因为是5个并发，所以需要减4
+
+        var fetchInfo = function(myurl, callback) {
+          // var fetchStart = new Date().getTime();
+          concurrencyCount1++;
+          num1 += 1;
+          console.log(
+            "现在的并发数是",
+            concurrencyCount1,
+            "，正在抓取的是",
+            myurl
+          );
+
+          superagent
+            .get(myurl)
+            .charset("utf-8") //解决编码问题
+            .end(function(err, ssres) {
+              if (err) {
+                callback(err, myurl + " error happened!");
+                errLength.push(myurl);
+                return next(err);
+              }
+
+              // var time = new Date().getTime() - fetchStart;
+              // console.log("抓取 " + myurl + " 成功", "，耗时" + time + "毫秒");
+              concurrencyCount1--;
+
+              // var $ = cheerio.load(ssres.text);
+
+              // var totalPage = $(".fr div a").html();
+
+              // // 对每页获取的结果进行处理函数
+              // getDownloadLink($, function(obj) {
+              //   res.write("<br/>");
+              //   res.write("url-->  " + myurl);
+              //   res.write("<br/>");
+              //   res.write("House number-->  " + obj.houseNum);
+              //   res.write("<br/>");
+              //   res.write("price-->  " + obj.houses[0].totalPrice);
+              //   res.write("<br/>");
+
+              //   //存为json文件
+              //   var fileName =
+              //     "D:\\pro_gra_sample\\express_demo\\" +
+              //     myurl.split("/")[4] +
+              //     ".json";
+              //   fs.writeFileSync(fileName, JSON.stringify(obj));
+              // });
+
+              res.write("<br/>");
+              res.write("url-->  " + myurl);
+              res.write("<br/>");
+
+              var result = {
+                movieLink: myurl
+              };
+              callback(null, result);
+            });
+        };
+        async.mapLimit(
+          urlPage,
+          6,
+          function(myurl, callback) {
+            fetchInfo(myurl, callback);
+          },
+          function(err, result) {
+            // 爬虫结束后的回调，可以做一些统计结果
+            console.log("抓包结束，一共抓取了-->" + urlPage.length + "条数据");
+            urlArr = []; //清空url数组
+            // urlPage = [];
+            return false;
+          }
+        );
+        // console.log("urlPage", urlPage);
+        // urlArr = []; //清空url数组
+        // return false;
       }
     );
   });
