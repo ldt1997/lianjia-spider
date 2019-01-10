@@ -111,7 +111,7 @@ app.get("/", function(req, res, next) {
             .split(":")[1];
 
           //生成各区块全部页数url数组
-          for (let i = 1; i <= 3; i++) {
+          for (let i = 1; i <= totalPage; i++) {
             urlPage.push(myurl + "pg" + i + "/");
           }
 
