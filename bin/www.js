@@ -11,7 +11,10 @@ var cheerio = require("cheerio");
 var fs = require("fs");
 
 var baseUrl = "https://gz.lianjia.com/ershoufang/"; //初始网页
+var errLength = []; //统计出错的链接数
 var urlArr = []; //区块url数组
+
+var urlPage = []; //各区块全部页数url数组
 
 // 将Unicode转化为中文
 function decodeUnicode(str) {
@@ -31,7 +34,55 @@ app.get("/", function(req, res, next) {
     var concurrencyCount = 0;
     var num = -4; //因为是5个并发，所以需要减4
 
-    // 对于每个url第一页，利用callback函数将结果返回去，然后在结果中取出整个结果数组。
+    // // 爬取房源信息
+    // var fetchUrl = function(myurl, callback) {
+    //   var fetchStart = new Date().getTime();
+    //   concurrencyCount++;
+    //   num += 1;
+    //   console.log("现在的并发数是", concurrencyCount, "，正在抓取的是", myurl);
+    //   superagent
+    //     .get(myurl)
+    //     .charset("utf-8") //解决编码问题
+    //     .end(function(err, ssres) {
+    //       if (err) {
+    //         callback(err, myurl + " error happened!");
+    //         errLength.push(myurl);
+    //         return next(err);
+    //       }
+
+    //       var time = new Date().getTime() - fetchStart;
+    //       console.log("抓取 " + myurl + " 成功", "，耗时" + time + "毫秒");
+    //       concurrencyCount--;
+
+    //       var $ = cheerio.load(ssres.text);
+
+    //       var totalPage = $(".fr div a").html();
+
+    //       // 对每页获取的结果进行处理函数
+    //       getDownloadLink($, function(obj) {
+    //         res.write("<br/>");
+    //         res.write("url-->  " + myurl);
+    //         res.write("<br/>");
+    //         res.write("House number-->  " + obj.houseNum);
+    //         res.write("<br/>");
+    //         res.write("price-->  " + obj.houses[0].totalPrice);
+    //         res.write("<br/>");
+
+    //         //存为json文件
+    //         var fileName =
+    //           "D:\\pro_gra_sample\\express_demo\\" +
+    //           myurl.split("/")[4] +
+    //           ".json";
+    //         fs.writeFileSync(fileName, JSON.stringify(obj));
+    //       });
+    //       var result = {
+    //         movieLink: myurl
+    //       };
+    //       callback(null, result);
+    //     });
+    // };
+
+    // 爬取各区块全部页数url
     var fetchUrl = function(myurl, callback) {
       var fetchStart = new Date().getTime();
       concurrencyCount++;
@@ -53,25 +104,16 @@ app.get("/", function(req, res, next) {
 
           var $ = cheerio.load(ssres.text);
 
-          var totalPage = $(".fr div a").html();
+          // 获取总页数
+          var totalPage = $(".house-lst-page-box")
+            .attr("page-data")
+            .split(",")[0]
+            .split(":")[1];
 
-          // 对每页获取的结果进行处理函数
-          getDownloadLink($, function(obj) {
-            res.write("<br/>");
-            res.write("url-->  " + myurl);
-            res.write("<br/>");
-            res.write("House number-->  " + obj.houseNum);
-            res.write("<br/>");
-            res.write("price-->  " + obj.houses[0].totalPrice);
-            res.write("<br/>");
-
-            //存为json文件
-            var fileName =
-              "D:\\pro_gra_sample\\express_demo\\" +
-              myurl.split("/")[4] +
-              ".json";
-            fs.writeFileSync(fileName, JSON.stringify(obj));
-          });
+          //生成各区块全部页数url数组
+          for (let i = 1; i <= 9; i++) {
+            urlPage.push(myurl + "pg" + i + "/");
+          }
           var result = {
             movieLink: myurl
           };
@@ -118,7 +160,6 @@ app.get("/", function(req, res, next) {
             var tem = {};
             tem.name = $(this).text(); //区名
             tem.href = "https://gz.lianjia.com" + $(this).attr("href"); //url
-            tem.href = []; //页数数组
             urlArr.push(tem.href);
             position.push(tem);
           });
@@ -138,6 +179,10 @@ app.get("/", function(req, res, next) {
 // 获取房源信息
 function getDownloadLink($, callback) {
   var houseNum = $(".total span").text();
+  var housePage = $(".house-lst-page-box")
+    .attr("page-data")
+    .split(",")[0]
+    .split(":")[1];
 
   var houses = [];
   $(".LOGCLICKDATA").each(function() {
@@ -200,6 +245,7 @@ function getDownloadLink($, callback) {
 
   var obj = {
     houseNum: houseNum,
+    housePage: housePage,
     houses: houses
   };
   if (!houseNum) {
