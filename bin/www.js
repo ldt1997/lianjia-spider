@@ -111,9 +111,10 @@ app.get("/", function(req, res, next) {
             .split(":")[1];
 
           //生成各区块全部页数url数组
-          for (let i = 1; i <= 9; i++) {
+          for (let i = 1; i <= 3; i++) {
             urlPage.push(myurl + "pg" + i + "/");
           }
+
           var result = {
             movieLink: myurl
           };
@@ -131,7 +132,9 @@ app.get("/", function(req, res, next) {
       },
       function(err, result) {
         // 爬虫结束后的回调，可以做一些统计结果
+        //爬取全部页面url结束后，对各页面url数组二次爬取房源信息
         console.log("抓包结束，一共抓取了-->" + urlArr.length + "条数据");
+        console.log("urlPage", urlPage);
         urlArr = []; //清空url数组
         return false;
       }
