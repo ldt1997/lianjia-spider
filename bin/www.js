@@ -9,6 +9,8 @@ var ep = eventproxy();
 var request = require("request");
 var cheerio = require("cheerio");
 var fs = require("fs");
+var MongoClient = require("mongodb").MongoClient; //数据库
+var urldb = "mongodb://localhost:27017/"; //数据库地址
 
 var baseUrl = "https://gz.lianjia.com/ershoufang/"; //初始网页
 var errLength = []; //统计出错的链接数
@@ -126,6 +128,23 @@ app.get("/", function(req, res, next) {
                   myurl.split("/")[4] +
                   ".json";
                 fs.writeFileSync(fileName, JSON.stringify(obj));
+
+                // 存入数据库
+                var colName = myurl.split("/")[4];
+                MongoClient.connect(
+                  urldb,
+                  function(err, db) {
+                    if (err) throw err;
+                    var dbo = db.db("lianjiaSpider");
+                    dbo
+                      .collection(colName)
+                      .insertMany(obj.houses, function(err, res) {
+                        if (err) throw err;
+                        console.log("插入的文档数量为: " + res.insertedCount);
+                        db.close();
+                      });
+                  }
+                );
               });
 
               var result = {
@@ -186,6 +205,21 @@ app.get("/", function(req, res, next) {
         var positionFilename =
           "D:\\pro_gra_sample\\express_demo\\position.json";
         fs.writeFileSync(positionFilename, JSON.stringify(positionJson));
+
+        //存入数据库
+        MongoClient.connect(
+          urldb,
+          function(err, db) {
+            if (err) throw err;
+            var dbo = db.db("lianjiaSpider");
+            dbo.collection("position").insertMany(position, function(err, res) {
+              if (err) throw err;
+              console.log("插入的文档数量为: " + res.insertedCount);
+              db.close();
+            });
+          }
+        );
+
         ep.emit("get_district_html", "get " + page + " successful");
       });
   })(baseUrl);
