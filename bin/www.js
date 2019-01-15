@@ -13,7 +13,6 @@ var fs = require("fs");
 var baseUrl = "https://gz.lianjia.com/ershoufang/"; //初始网页
 var errLength = []; //统计出错的链接数
 var urlArr = []; //区块url数组
-
 var urlPage = []; //各区块全部页数url数组
 
 // 将Unicode转化为中文
@@ -33,54 +32,6 @@ app.get("/", function(req, res, next) {
   ep.after("get_district_html", 1, function(eps) {
     var concurrencyCount = 0;
     var num = -4; //因为是5个并发，所以需要减4
-
-    // // 爬取房源信息
-    // var fetchUrl = function(myurl, callback) {
-    //   var fetchStart = new Date().getTime();
-    //   concurrencyCount++;
-    //   num += 1;
-    //   console.log("现在的并发数是", concurrencyCount, "，正在抓取的是", myurl);
-    //   superagent
-    //     .get(myurl)
-    //     .charset("utf-8") //解决编码问题
-    //     .end(function(err, ssres) {
-    //       if (err) {
-    //         callback(err, myurl + " error happened!");
-    //         errLength.push(myurl);
-    //         return next(err);
-    //       }
-
-    //       var time = new Date().getTime() - fetchStart;
-    //       console.log("抓取 " + myurl + " 成功", "，耗时" + time + "毫秒");
-    //       concurrencyCount--;
-
-    //       var $ = cheerio.load(ssres.text);
-
-    //       var totalPage = $(".fr div a").html();
-
-    //       // 对每页获取的结果进行处理函数
-    //       getDownloadLink($, function(obj) {
-    //         res.write("<br/>");
-    //         res.write("url-->  " + myurl);
-    //         res.write("<br/>");
-    //         res.write("House number-->  " + obj.houseNum);
-    //         res.write("<br/>");
-    //         res.write("price-->  " + obj.houses[0].totalPrice);
-    //         res.write("<br/>");
-
-    //         //存为json文件
-    //         var fileName =
-    //           "D:\\pro_gra_sample\\express_demo\\" +
-    //           myurl.split("/")[4] +
-    //           ".json";
-    //         fs.writeFileSync(fileName, JSON.stringify(obj));
-    //       });
-    //       var result = {
-    //         movieLink: myurl
-    //       };
-    //       callback(null, result);
-    //     });
-    // };
 
     // 爬取各区块全部页数
     var fetchUrl = function(myurl, callback) {
@@ -111,7 +62,7 @@ app.get("/", function(req, res, next) {
             .split(":")[1];
 
           //生成各区块全部页数url数组
-          for (let i = 1; i <= totalPage; i++) {
+          for (let i = 1; i <= 3; i++) {
             urlPage.push(myurl + "pg" + i + "/");
           }
 
@@ -134,10 +85,10 @@ app.get("/", function(req, res, next) {
         //爬取全部页面url结束后，对各页面url数组二次爬取房源信息
         // 爬取房源信息
         var concurrencyCount1 = 0;
-        var num1 = -5; //因为是5个并发，所以需要减4
+        var num1 = -5; //因为是6个并发，所以需要减5
 
         var fetchInfo = function(myurl, callback) {
-          // var fetchStart = new Date().getTime();
+          var fetchStart1 = new Date().getTime();
           concurrencyCount1++;
           num1 += 1;
           console.log(
@@ -157,35 +108,25 @@ app.get("/", function(req, res, next) {
                 return next(err);
               }
 
-              // var time = new Date().getTime() - fetchStart;
-              // console.log("抓取 " + myurl + " 成功", "，耗时" + time + "毫秒");
+              var time1 = new Date().getTime() - fetchStart1;
+              console.log("抓取 " + myurl + " 成功", "，耗时" + time1 + "毫秒");
               concurrencyCount1--;
 
-              // var $ = cheerio.load(ssres.text);
+              var $ = cheerio.load(ssres.text);
 
-              // var totalPage = $(".fr div a").html();
+              // 对每页获取的结果进行处理函数
+              getDownloadLink($, function(obj) {
+                res.write("<br/>");
+                res.write("url-->  " + myurl);
+                res.write("<br/>");
 
-              // // 对每页获取的结果进行处理函数
-              // getDownloadLink($, function(obj) {
-              //   res.write("<br/>");
-              //   res.write("url-->  " + myurl);
-              //   res.write("<br/>");
-              //   res.write("House number-->  " + obj.houseNum);
-              //   res.write("<br/>");
-              //   res.write("price-->  " + obj.houses[0].totalPrice);
-              //   res.write("<br/>");
-
-              //   //存为json文件
-              //   var fileName =
-              //     "D:\\pro_gra_sample\\express_demo\\" +
-              //     myurl.split("/")[4] +
-              //     ".json";
-              //   fs.writeFileSync(fileName, JSON.stringify(obj));
-              // });
-
-              res.write("<br/>");
-              res.write("url-->  " + myurl);
-              res.write("<br/>");
+                //存为json文件
+                var fileName =
+                  "D:\\pro_gra_sample\\express_demo\\" +
+                  myurl.split("/")[4] +
+                  ".json";
+                fs.writeFileSync(fileName, JSON.stringify(obj));
+              });
 
               var result = {
                 movieLink: myurl
@@ -203,12 +144,10 @@ app.get("/", function(req, res, next) {
             // 爬虫结束后的回调，可以做一些统计结果
             console.log("抓包结束，一共抓取了-->" + urlPage.length + "条数据");
             urlArr = []; //清空url数组
-            // urlPage = [];
+            urlPage = [];
             return false;
           }
         );
-        // console.log("urlPage", urlPage);
-        // urlArr = []; //清空url数组
         // return false;
       }
     );
@@ -254,11 +193,11 @@ app.get("/", function(req, res, next) {
 
 // 获取房源信息
 function getDownloadLink($, callback) {
-  var houseNum = $(".total span").text();
-  var housePage = $(".house-lst-page-box")
-    .attr("page-data")
-    .split(",")[0]
-    .split(":")[1];
+  // var houseNum = $(".total span").text();
+  // var housePage = $(".house-lst-page-box")
+  //   .attr("page-data")
+  //   .split(",")[0]
+  //   .split(":")[1];
 
   var houses = [];
   $(".LOGCLICKDATA").each(function() {
@@ -320,13 +259,13 @@ function getDownloadLink($, callback) {
   });
 
   var obj = {
-    houseNum: houseNum,
-    housePage: housePage,
+    // houseNum: houseNum,
+    // housePage: housePage,
     houses: houses
   };
-  if (!houseNum) {
-    houseNum = "暂无房源";
-  }
+  // if (!houseNum) {
+  //   houseNum = "暂无房源";
+  // }
   callback(obj);
 }
 var server = app.listen(8080, function() {
