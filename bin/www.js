@@ -12,7 +12,7 @@ var fs = require("fs");
 var MongoClient = require("mongodb").MongoClient; //数据库
 var urldb = "mongodb://localhost:27017/"; //数据库地址
 
-var baseUrl = "https://gz.lianjia.com/ershoufang/"; //初始网页
+var baseUrl = "https://gz.lianjia.com/chengjiao/"; //初始网页
 var errLength = []; //统计出错的链接数
 var urlArr = []; //区块url数组
 var urlPage = []; //各区块全部页数url数组
@@ -58,13 +58,15 @@ app.get("/", function(req, res, next) {
           var $ = cheerio.load(ssres.text);
 
           // 获取总页数
-          var totalPage = $(".house-lst-page-box")
-            .attr("page-data")
-            .split(",")[0]
-            .split(":")[1];
+          var totalPage = $(".house-lst-page-box").attr("page-data")
+            ? $(".house-lst-page-box")
+                .attr("page-data")
+                .split(",")[0]
+                .split(":")[1]
+            : 1;
 
           //生成各区块全部页数url数组
-          for (let i = 1; i <= 3; i++) {
+          for (let i = 1; i <= 1; i++) {
             urlPage.push(myurl + "pg" + i + "/");
           }
 
@@ -139,7 +141,11 @@ app.get("/", function(req, res, next) {
                     dbo
                       .collection(colName)
                       .insertMany(obj.houses, function(err, res) {
-                        if (err) throw err;
+                        if (err) {
+                          console.log("数据库插入", myurl, "出错了");
+                          console.log("obj.houses:", obj.houses);
+                          throw err;
+                        }
                         console.log("插入的文档数量为: " + res.insertedCount);
                         db.close();
                       });
@@ -234,7 +240,7 @@ function getDownloadLink($, callback) {
   //   .split(":")[1];
 
   var houses = [];
-  $(".LOGCLICKDATA").each(function() {
+  $(".listContent li").each(function() {
     var house = {};
     //标题
     house.titleName = decodeUnicode(
@@ -246,37 +252,57 @@ function getDownloadLink($, callback) {
     //楼盘名
     house.name = decodeUnicode(
       $(this)
-        .find(".houseInfo")
-        .find("a")
-        .html()
-        .replace(/\s+/g, "")
-    );
-
-    var houseInfo = [];
-    houseInfo = decodeUnicode(
-      $(this)
-        .find(".houseInfo")
+        .find(".info .title a")
         .text()
-    ).split(" | ");
+    ).split(" ")[0];
     //房屋户型
-    house.layout = houseInfo[1];
-    //大小
-    house.size = houseInfo[2];
-    //朝向
-    house.toward = houseInfo[3];
-    //装修
-    house.decoration = houseInfo[4];
-    //电梯
-    house.elevator = houseInfo[5] ? houseInfo[5] : "";
-
-    //地址
-    house.positionInfo = decodeUnicode(
+    house.layout = decodeUnicode(
       $(this)
-        .find(".positionInfo")
+        .find(".info .title")
         .find("a")
         .html()
-    );
-    //房子总价
+    ).split(" ")[1];
+    //大小
+    house.size = decodeUnicode(
+      $(this)
+        .find(".info .title")
+        .find("a")
+        .html()
+    ).split(" ")[2];
+
+    // var houseInfo = [];
+    // houseInfo = decodeUnicode(
+    //   $(this)
+    //     .find(".houseInfo")
+    //     .text()
+    // ).split(" | ");
+    // //朝向
+    // house.toward = houseInfo[0] ? houseInfo[0] : "";
+    // //装修
+    // house.decoration = houseInfo[1] ? houseInfo[1] : "";
+    // //电梯
+    // house.elevator = houseInfo[2] ? houseInfo[2] : "";
+
+    //挂牌总价
+    house.listedPrice = decodeUnicode(
+      $(this)
+        .find(".dealCycleTxt span")
+        .eq(0)
+        .text()
+    ).slice(2, -1);
+    //成交周期
+    house.dealPeriod = decodeUnicode(
+      $(this)
+        .find(".dealCycleTxt span")
+        .eq(1)
+        .text()
+    ).slice(4, -1);
+    //成交时间
+    house.dealDate = $(this)
+      .find(".dealDate")
+      .text();
+
+    //房子成交总价
     house.totalPrice = decodeUnicode(
       $(this)
         .find(".totalPrice span")
@@ -285,8 +311,8 @@ function getDownloadLink($, callback) {
     // 房子单价
     house.unitPrice = decodeUnicode(
       $(this)
-        .find(".unitPrice")
-        .attr("data-price")
+        .find(".unitPrice span")
+        .text()
     );
 
     houses.push(house);
