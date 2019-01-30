@@ -14,7 +14,7 @@ var MongoClient = require("mongodb").MongoClient; //数据库
 var urldb = "mongodb://localhost:27017/"; //数据库地址
 
 var baseUrl = "https://gz.lianjia.com/chengjiao/"; //初始网页
-var errLength = []; //统计出错的链接数
+var errUrl = []; //统计出错的链接数
 var urlArr = []; //区块url数组
 var urlPage = []; //各区块全部页数url数组
 
@@ -64,6 +64,7 @@ app.get("/", function(req, res, next) {
             console.log("抓包结束，一共抓取了-->" + urlPage.length + "条数据");
             urlArr = []; //清空url数组
             urlPage = [];
+            errUrl = []; // 清空错误数组
             return false;
           }
         );
@@ -83,6 +84,7 @@ app.get("/", function(req, res, next) {
 function GetUrlQueue(page) {
   superagent
     .get(page)
+    .buffer(true)
     .charset("utf-8")
     .end(function(err, sres) {
       // 常规的错误处理
@@ -141,14 +143,14 @@ var fetchUrl = function(myurl, callback) {
   superagent
     .get(myurl)
     .set({ "User-Agent": userAgent })
+    .buffer(true)
     .charset("utf-8") //解决编码问题
     .end(function(err, ssres) {
       if (err) {
         callback(err, myurl + " error happened!");
-        errLength.push(myurl);
+        errUrl.push(myurl);
         return next(err);
       }
-
       var time = new Date().getTime() - fetchStart;
       console.log("抓取 " + myurl + " 成功", "，耗时" + time + "毫秒");
       concurrencyCount--;
@@ -157,14 +159,12 @@ var fetchUrl = function(myurl, callback) {
 
       // 获取总页数
       var totalPage = $(".house-lst-page-box").attr("page-data")
-        ? $(".house-lst-page-box")
-            .attr("page-data")
-            .split(",")[0]
-            .split(":")[1]
+        ? JSON.parse($(".house-lst-page-box").attr("page-data")).totalPage
         : 1;
+      totalPage = totalPage >= 10 ? 10 : totalPage;
 
       //生成各区块全部页数url数组
-      for (let i = 1; i <= 1; i++) {
+      for (let i = 1; i <= totalPage; i++) {
         urlPage.push(myurl + "pg" + i + "/");
       }
 
@@ -239,7 +239,15 @@ function AnalysisHtml($, callback) {
         .find(".dealCycleTxt span")
         .eq(1)
         .text()
-    ).slice(4, -1);
+    )
+      ? decodeUnicode(
+          $(this)
+            .find(".dealCycleTxt span")
+            .eq(1)
+            .text()
+        ).slice(4, -1)
+      : 0;
+
     //成交时间
     house.dealDate = $(this)
       .find(".dealDate")
@@ -261,13 +269,21 @@ function AnalysisHtml($, callback) {
     houses.push(house);
   });
 
+  var curPage = $(".house-lst-page-box").attr("page-data")
+    ? JSON.parse($(".house-lst-page-box").attr("page-data")).curPage
+    : 1;
+
+  for (let i = 0; i < houses.length; i++) {
+    houses[i].curPage = curPage;
+  }
+
   var obj = {
     houses: houses
   };
   callback(obj);
 }
 
-//异步并发爬取爬取 pageUrl 队列，获取所需数据
+//异步并发爬取 pageUrl 队列，获取所需数据
 function DownloadHtml(res, myurl, callback) {
   var fetchStart1 = new Date().getTime();
   concurrencyCount1++;
@@ -276,11 +292,12 @@ function DownloadHtml(res, myurl, callback) {
 
   superagent
     .get(myurl)
+    .buffer(true)
     .charset("utf-8") //解决编码问题
     .end(function(err, ssres) {
       if (err) {
         callback(err, myurl + " error happened!");
-        errLength.push(myurl);
+        errUrl.push(myurl);
         return next(err);
       }
 
@@ -296,10 +313,10 @@ function DownloadHtml(res, myurl, callback) {
         res.write("url-->  " + myurl);
         res.write("<br/>");
 
-        //存为json文件
-        var fileName =
-          "D:\\pro_gra_sample\\express_demo\\" + myurl.split("/")[4] + ".json";
-        fs.writeFileSync(fileName, JSON.stringify(obj));
+        // //存为json文件
+        // var fileName =
+        //   "D:\\pro_gra_sample\\express_demo\\" + myurl.split("/")[4] + ".json";
+        // fs.writeFileSync(fileName, JSON.stringify(obj));
 
         // 存入数据库
         var colName = myurl.split("/")[4];
@@ -309,9 +326,10 @@ function DownloadHtml(res, myurl, callback) {
             if (err) throw err;
             var dbo = db.db("lianjiaSpider");
             dbo.collection(colName).insertMany(obj.houses, function(err, res) {
-              if (err) {
+              if (err || obj.houses.length === 0) {
                 console.log("数据库插入", myurl, "出错了");
                 console.log("obj.houses:", obj.houses);
+                errUrl.push(myurl);
                 throw err;
               }
               console.log("插入的文档数量为: " + res.insertedCount);
