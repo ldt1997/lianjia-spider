@@ -1,3 +1,4 @@
+var userAgents = require("../userAgent"); // 动态请求头
 var express = require("express");
 var app = express();
 var superagent = require("superagent");
@@ -49,7 +50,6 @@ app.get("/", function(req, res, next) {
       },
       function(err, result) {
         //爬取全部页面url结束后，对各页面url数组二次爬取房源信息
-        // 爬取房源信息
         // var concurrencyCount1 = 0;
         // var num1 = -5; //因为是6个并发，所以需要减5
 
@@ -137,8 +137,10 @@ var fetchUrl = function(myurl, callback) {
   concurrencyCount++;
   num += 1;
   console.log("现在的并发数是", concurrencyCount, "，正在抓取的是", myurl);
+  let userAgent = userAgents[parseInt(Math.random() * userAgents.length)]; //动态请求头
   superagent
     .get(myurl)
+    .set({ "User-Agent": userAgent })
     .charset("utf-8") //解决编码问题
     .end(function(err, ssres) {
       if (err) {
