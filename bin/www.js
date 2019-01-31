@@ -111,9 +111,6 @@ function GetUrlQueue(page) {
        *流程控制语句
        *当区域链接爬取完毕之后，开始爬取各区二手房
        */
-      const positionJson = { position: position };
-      var positionFilename = "D:\\pro_gra_sample\\express_demo\\position.json";
-      fs.writeFileSync(positionFilename, JSON.stringify(positionJson));
 
       //存入数据库
       MongoClient.connect(
@@ -121,6 +118,15 @@ function GetUrlQueue(page) {
         function(err, db) {
           if (err) throw err;
           var dbo = db.db("lianjiaSpider");
+          // 初始化数据库
+          dbo
+            .dropDatabase()
+            .then(res => {
+              console.log("数据库初始化成功");
+            })
+            .catch(err => {
+              console.log("数据库初始化失败");
+            });
           dbo.collection("position").insertMany(position, function(err, res) {
             if (err) throw err;
             console.log("插入的文档数量为: " + res.insertedCount);
@@ -161,7 +167,7 @@ var fetchUrl = function(myurl, callback) {
       var totalPage = $(".house-lst-page-box").attr("page-data")
         ? JSON.parse($(".house-lst-page-box").attr("page-data")).totalPage
         : 1;
-      totalPage = totalPage >= 10 ? 10 : totalPage;
+      // totalPage = totalPage >= 75 ? 75 : totalPage;
 
       //生成各区块全部页数url数组
       for (let i = 1; i <= totalPage; i++) {
@@ -312,11 +318,6 @@ function DownloadHtml(res, myurl, callback) {
         res.write("<br/>");
         res.write("url-->  " + myurl);
         res.write("<br/>");
-
-        // //存为json文件
-        // var fileName =
-        //   "D:\\pro_gra_sample\\express_demo\\" + myurl.split("/")[4] + ".json";
-        // fs.writeFileSync(fileName, JSON.stringify(obj));
 
         // 存入数据库
         var colName = myurl.split("/")[4];
