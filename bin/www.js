@@ -113,27 +113,24 @@ function GetUrlQueue(page) {
        */
 
       //存入数据库
-      MongoClient.connect(
-        urldb,
-        function(err, db) {
-          if (err) throw err;
-          var dbo = db.db("lianjiaSpider");
-          // 初始化数据库
-          dbo
-            .dropDatabase()
-            .then(res => {
-              console.log("数据库初始化成功");
-            })
-            .catch(err => {
-              console.log("数据库初始化失败");
-            });
-          dbo.collection("position").insertMany(position, function(err, res) {
-            if (err) throw err;
-            console.log("插入的文档数量为: " + res.insertedCount);
-            db.close();
+      MongoClient.connect(urldb, function(err, db) {
+        if (err) throw err;
+        var dbo = db.db("lianjiaSpider");
+        // 初始化数据库
+        dbo
+          .dropDatabase()
+          .then(res => {
+            console.log("数据库初始化成功");
+          })
+          .catch(err => {
+            console.log("数据库初始化失败");
           });
-        }
-      );
+        dbo.collection("position").insertMany(position, function(err, res) {
+          if (err) throw err;
+          console.log("插入的文档数量为: " + res.insertedCount);
+          db.close();
+        });
+      });
 
       ep.emit("getUrlQueue", "get " + page + " successful");
     });
@@ -170,7 +167,7 @@ var fetchUrl = function(myurl, callback) {
       // totalPage = totalPage >= 75 ? 75 : totalPage;
 
       //生成各区块全部页数url数组
-      for (let i = 1; i <= totalPage; i++) {
+      for (let i = 1; i <= 1; i++) {
         urlPage.push(myurl + "pg" + i + "/");
       }
 
@@ -321,23 +318,20 @@ function DownloadHtml(res, myurl, callback) {
 
         // 存入数据库
         var colName = myurl.split("/")[4];
-        MongoClient.connect(
-          urldb,
-          function(err, db) {
-            if (err) throw err;
-            var dbo = db.db("lianjiaSpider");
-            dbo.collection(colName).insertMany(obj.houses, function(err, res) {
-              if (err || obj.houses.length === 0) {
-                console.log("数据库插入", myurl, "出错了");
-                console.log("obj.houses:", obj.houses);
-                errUrl.push(myurl);
-                throw err;
-              }
-              console.log("插入的文档数量为: " + res.insertedCount);
-              db.close();
-            });
-          }
-        );
+        MongoClient.connect(urldb, function(err, db) {
+          if (err) throw err;
+          var dbo = db.db("lianjiaSpider");
+          dbo.collection(colName).insertMany(obj.houses, function(err, res) {
+            if (err || obj.houses.length === 0) {
+              console.log("数据库插入", myurl, "出错了");
+              console.log("obj.houses:", obj.houses);
+              errUrl.push(myurl);
+              throw err;
+            }
+            console.log("插入的文档数量为: " + res.insertedCount);
+            db.close();
+          });
+        });
       });
 
       var result = {
