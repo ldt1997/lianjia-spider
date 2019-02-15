@@ -90,7 +90,7 @@ function GetUrlQueue(page) {
       // 常规的错误处理
       if (err) {
         console.log("抓取" + page + "这条信息的时候出错了");
-        return next(err);
+        // return next(err);
       }
       var $ = cheerio.load(sres.text);
       // 区域数组
@@ -152,7 +152,8 @@ var fetchUrl = function(myurl, callback) {
       if (err) {
         callback(err, myurl + " error happened!");
         errUrl.push(myurl);
-        return next(err);
+        console.log("抓取", myurl, "这条信息时出错了");
+        // return next(err);
       }
       var time = new Date().getTime() - fetchStart;
       console.log("抓取 " + myurl + " 成功", "，耗时" + time + "毫秒");
@@ -167,7 +168,7 @@ var fetchUrl = function(myurl, callback) {
       // totalPage = totalPage >= 75 ? 75 : totalPage;
 
       //生成各区块全部页数url数组
-      for (let i = 1; i <= 1; i++) {
+      for (let i = 1; i <= totalPage; i++) {
         urlPage.push(myurl + "pg" + i + "/");
       }
 
@@ -230,25 +231,31 @@ function AnalysisHtml($, callback) {
     ).split(" ")[2];
 
     //挂牌总价
-    house.listedPrice = decodeUnicode(
-      $(this)
-        .find(".dealCycleTxt span")
-        .eq(0)
-        .text()
-    ).slice(2, -1);
+    house.listedPrice = $(this)
+      .find(".dealCycleTxt span")
+      .eq(0)
+      .text()
+      .slice(2, -1)
+      ? Number(
+          $(this)
+            .find(".dealCycleTxt span")
+            .eq(0)
+            .text()
+            .slice(2, -1)
+        )
+      : 0;
     //成交周期
-    house.dealPeriod = decodeUnicode(
-      $(this)
-        .find(".dealCycleTxt span")
-        .eq(1)
-        .text()
-    )
-      ? decodeUnicode(
+    house.dealPeriod = $(this)
+      .find(".dealCycleTxt span")
+      .eq(1)
+      .text()
+      ? Number(
           $(this)
             .find(".dealCycleTxt span")
             .eq(1)
             .text()
-        ).slice(4, -1)
+            .slice(4, -1)
+        )
       : 0;
 
     //成交时间
@@ -257,13 +264,13 @@ function AnalysisHtml($, callback) {
       .text();
 
     //房子成交总价
-    house.totalPrice = decodeUnicode(
+    house.totalPrice = Number(
       $(this)
         .find(".totalPrice span")
         .text()
     );
     // 房子单价
-    house.unitPrice = decodeUnicode(
+    house.unitPrice = Number(
       $(this)
         .find(".unitPrice span")
         .text()
@@ -301,7 +308,8 @@ function DownloadHtml(res, myurl, callback) {
       if (err) {
         callback(err, myurl + " error happened!");
         errUrl.push(myurl);
-        return next(err);
+        console.log("抓取", myurl, "这条信息时出错了");
+        // return next(err);
       }
 
       var time1 = new Date().getTime() - fetchStart1;
