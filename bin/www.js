@@ -35,6 +35,14 @@ function decodeUnicode(str) {
     : null;
 }
 
+//延时函数
+function sleep(delay) {
+  var start = new Date().getTime();
+  while (new Date().getTime() - start < delay) {
+    continue;
+  }
+}
+
 app.get("/", function(req, res, next) {
   // 命令 ep 重复监听 emit事件(getUrlQueue)，当getUrlQueue爬取完毕之后执行
   ep.after("getUrlQueue", 1, function(list) {
@@ -57,6 +65,8 @@ app.get("/", function(req, res, next) {
           urlPage,
           6,
           function(myurl, callback) {
+            //加个延时防止页面加载慢爬到空页面
+            // sleep(500);
             DownloadHtml(res, myurl, callback);
           },
           function(err, result) {
@@ -103,6 +113,7 @@ function GetUrlQueue(page) {
         .each(function() {
           var tem = {};
           tem.name = $(this).text(); //区名
+          tem.code = $(this).attr("href");
           tem.href = "https://gz.lianjia.com" + $(this).attr("href"); //url
           urlArr.push(tem.href);
           position.push(tem);
@@ -111,7 +122,6 @@ function GetUrlQueue(page) {
        *流程控制语句
        *当区域链接爬取完毕之后，开始爬取各区二手房
        */
-
       //存入数据库
       MongoClient.connect(urldb, function(err, db) {
         if (err) throw err;
@@ -218,17 +228,25 @@ function AnalysisHtml($, callback) {
     //房屋户型
     house.layout = decodeUnicode(
       $(this)
-        .find(".info .title")
-        .find("a")
+        .find(".info .title a")
         .html()
     ).split(" ")[1];
-    //大小
-    house.size = decodeUnicode(
-      $(this)
-        .find(".info .title")
-        .find("a")
-        .html()
-    ).split(" ")[2];
+    //大小面积
+    house.size = $(this)
+      .find(".info .title")
+      .find("a")
+      .html()
+      .split(" ")[2]
+      ? Number(
+          decodeUnicode(
+            $(this)
+              .find(".info .title a")
+              .html()
+          )
+            .split(" ")[2]
+            .slice(0, -2)
+        )
+      : 0;
 
     //挂牌总价
     house.listedPrice = $(this)
@@ -306,10 +324,14 @@ function DownloadHtml(res, myurl, callback) {
     .charset("utf-8") //解决编码问题
     .end(function(err, ssres) {
       if (err) {
-        callback(err, myurl + " error happened!");
         errUrl.push(myurl);
         console.log("抓取", myurl, "这条信息时出错了");
-        // return next(err);
+        callback(err, myurl + " error happened!");
+      }
+      if (typeof ssres === "undefined") {
+        errUrl.push(myurl);
+        console.log("抓取", myurl, "这条信息时出错了,内容为空");
+        callback(null, []);
       }
 
       var time1 = new Date().getTime() - fetchStart1;
@@ -327,13 +349,15 @@ function DownloadHtml(res, myurl, callback) {
         // 存入数据库
         var colName = myurl.split("/")[4];
         MongoClient.connect(urldb, function(err, db) {
-          if (err) throw err;
+          if (err || obj.houses.length === 0) {
+            console.log("数据库插入", myurl, "出错了");
+            console.log("obj.houses:", obj.houses);
+            errUrl.push(myurl);
+            throw err;
+          }
           var dbo = db.db("lianjiaSpider");
           dbo.collection(colName).insertMany(obj.houses, function(err, res) {
-            if (err || obj.houses.length === 0) {
-              console.log("数据库插入", myurl, "出错了");
-              console.log("obj.houses:", obj.houses);
-              errUrl.push(myurl);
+            if (err) {
               throw err;
             }
             console.log("插入的文档数量为: " + res.insertedCount);
