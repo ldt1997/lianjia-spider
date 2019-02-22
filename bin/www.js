@@ -23,6 +23,8 @@ var num = -4; //因为是5个并发，所以需要减4
 var concurrencyCount1 = 0;
 var num1 = -5; //因为是6个并发，所以需要减5
 
+var testNum = 0;
+
 // 将Unicode转化为中文
 function decodeUnicode(str) {
   return str
@@ -113,7 +115,9 @@ function GetUrlQueue(page) {
         .each(function() {
           var tem = {};
           tem.name = $(this).text(); //区名
-          tem.code = $(this).attr("href");
+          tem.code = $(this)
+            .attr("href")
+            .split("/")[2];
           tem.href = "https://gz.lianjia.com" + $(this).attr("href"); //url
           urlArr.push(tem.href);
           position.push(tem);
@@ -317,23 +321,19 @@ function DownloadHtml(res, myurl, callback) {
   concurrencyCount1++;
   num1 += 1;
   console.log("现在的并发数是", concurrencyCount1, "，正在抓取的是", myurl);
-
   superagent
     .get(myurl)
     .buffer(true)
     .charset("utf-8") //解决编码问题
     .end(function(err, ssres) {
-      if (err) {
+      testNum++;
+      if (err || typeof ssres === "undefined") {
         errUrl.push(myurl);
         console.log("抓取", myurl, "这条信息时出错了");
+        console.log(err);
+        console.log("爬取了", testNum, "条数据");
         callback(err, myurl + " error happened!");
       }
-      if (typeof ssres === "undefined") {
-        errUrl.push(myurl);
-        console.log("抓取", myurl, "这条信息时出错了,内容为空");
-        callback(null, []);
-      }
-
       var time1 = new Date().getTime() - fetchStart1;
       console.log("抓取 " + myurl + " 成功", "，耗时" + time1 + "毫秒");
       concurrencyCount1--;
@@ -376,3 +376,4 @@ function DownloadHtml(res, myurl, callback) {
 var server = app.listen(8080, function() {
   console.log("listening at 8080");
 });
+server.setTimeout(0); //将服务器端的超时机制关闭
