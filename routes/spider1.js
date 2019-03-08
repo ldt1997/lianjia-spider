@@ -26,7 +26,7 @@ var num1 = -5; //因为是6个并发，所以需要减5
 
 var testNum = 0;
 
-/****爬虫服务器*****/
+/****爬虫服务器 此为3.8前旧版爬虫备份*****/
 
 // 将Unicode转化为中文
 function decodeUnicode(str) {
