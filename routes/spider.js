@@ -216,10 +216,11 @@ function GetPageQueue() {
 }
 
 // 获取房源信息
-function AnalysisHtml($, callback) {
+function AnalysisHtml($, myurl, callback) {
   var houses = [];
   $(".listContent li").each(function() {
     var house = {};
+    house.position = myurl.split("/")[4]; //地区
     //标题
     house.titleName = decodeUnicode(
       $(this)
@@ -241,8 +242,7 @@ function AnalysisHtml($, callback) {
     ).split(" ")[1];
     //大小面积
     house.size = $(this)
-      .find(".info .title")
-      .find("a")
+      .find(".info .title a")
       .html()
       .split(" ")[2]
       ? Number(
@@ -255,6 +255,45 @@ function AnalysisHtml($, callback) {
             .slice(0, -2)
         )
       : 0;
+
+    //朝向
+    house.toward = $(this)
+      .find(".houseInfo")
+      .text()
+      .split(" | ")[0]
+      ? decodeUnicode(
+          $(this)
+            .find(".houseInfo")
+            .text()
+            .split(" | ")[0]
+        )
+      : "其他";
+
+    //装修
+    house.decoration = $(this)
+      .find(".houseInfo")
+      .text()
+      .split("| ")[1]
+      ? decodeUnicode(
+          $(this)
+            .find(".houseInfo")
+            .text()
+            .split("| ")[1]
+        )
+      : "其他";
+
+    //电梯
+    house.elevator = $(this)
+      .find(".houseInfo")
+      .text()
+      .split("| ")[2]
+      ? decodeUnicode(
+          $(this)
+            .find(".houseInfo")
+            .text()
+            .split("| ")[2]
+        )
+      : "其他";
 
     //挂牌总价
     house.listedPrice = $(this)
@@ -345,13 +384,12 @@ function DownloadHtml(res, myurl, callback) {
       var $ = cheerio.load(ssres.text);
 
       // 对每页获取的结果进行处理函数
-      AnalysisHtml($, function(obj) {
+      AnalysisHtml($, myurl, function(obj) {
         res.write("<br/>");
         res.write("url-->  " + myurl);
         res.write("<br/>");
 
         // 存入数据库
-        var colName = myurl.split("/")[4];
         MongoClient.connect(urldb, function(err, db) {
           if (err || obj.houses.length === 0) {
             console.log("数据库插入", myurl, "出错了");
@@ -360,7 +398,7 @@ function DownloadHtml(res, myurl, callback) {
             throw err;
           }
           var dbo = db.db("lianjiaSpider");
-          dbo.collection(colName).insertMany(obj.houses, function(err, res) {
+          dbo.collection("houses").insertMany(obj.houses, function(err, res) {
             if (err) {
               throw err;
             }
