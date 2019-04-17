@@ -14,13 +14,13 @@ var fs = require("fs");
 var MongoClient = require("mongodb").MongoClient; //数据库
 var urldb = "mongodb://localhost:27017/"; //数据库地址
 
-var baseUrl = "https://gz.lianjia.com/chengjiao/"; //初始网页
+var baseUrl = "https://gz.lianjia.com/chengjiao/"; //种子url
 var errUrl = []; //统计出错的链接数
 var urlArr = []; //区块url数组
 var urlPage = []; //各区块全部页数url数组
-var dbName = "lianjiaSpider";
-var positionColName = "position";
-var houseColName = "houses";
+var dbName = "lianjiaSpider"; //数据库名
+var positionColName = "position"; //区块集合名
+var houseColName = "houses"; //房源集合名
 
 var concurrencyCount = 0;
 var num = -4; //因为是5个并发，所以需要减4
@@ -54,9 +54,6 @@ function sleep(delay) {
 // 爬虫运行后监听getUrlQueue事件，当getUrlQueue爬取完毕后执行
 router.get("/", function(req, res, next) {
   ep.after("getUrlQueue", 1, function(list) {
-    // var concurrencyCount = 0;
-    // var num = -4; //因为是5个并发，所以需要减4
-
     // 控制最大并发数为5，在结果中取出callback返回来的整个结果数组。
     async.mapLimit(
       urlArr,
@@ -66,9 +63,6 @@ router.get("/", function(req, res, next) {
       },
       function(err, result) {
         //爬取全部页面url结束后，对各页面url数组二次爬取房源信息
-        // var concurrencyCount1 = 0;
-        // var num1 = -5; //因为是6个并发，所以需要减5
-
         async.mapLimit(
           urlPage,
           6,
@@ -76,8 +70,8 @@ router.get("/", function(req, res, next) {
             DownloadHtml(res, myurl, callback);
           },
           function(err, result) {
-            // 爬虫结束后的回调，可以做一些统计结果
-            console.log("抓包结束，一共抓取了-->" + urlPage.length + "条数据");
+            // 爬虫结束后的回调
+            console.log("抓包结束，一共抓取了-->" + urlPage.length + "条网页");
             console.log("抓包失败条数为 ", errUrl.length, " 条");
             res.send({
               data: {
@@ -207,24 +201,6 @@ var fetchUrl = function(myurl, callback) {
       callback(null, result);
     });
 };
-
-// 循环爬取 positionUrl 队列，从页面中获取各区块数据总页数，生成子url
-function GetPageQueue() {
-  var concurrencyCount = 0;
-  var num = -4; //因为是5个并发，所以需要减4
-  // 控制最大并发数为5，在结果中取出callback返回来的整个结果数组。
-  async.mapLimit(
-    urlArr,
-    5,
-    function(myurl, callback) {
-      fetchUrl(myurl, callback);
-    },
-    function(err, result) {
-      //获取全部url结束后，对各页面url数组二次爬取房源信息
-      ep.emit("GetPageQueue", result);
-    }
-  );
-}
 
 // 获取房源信息
 function AnalysisHtml($, myurl, callback) {
@@ -383,12 +359,10 @@ function DownloadHtml(res, myurl, callback) {
     .buffer(true)
     .charset("utf-8") //解决编码问题
     .end(function(err, ssres) {
-      testNum++;
       if (err || typeof ssres === "undefined") {
         errUrl.push(myurl);
-        console.log("抓取", myurl, "这条信息时出错了");
+        console.log("抓取", myurl, "这条信息时出错了，正在重新抓取.....");
         console.log(err);
-        console.log("爬取了", testNum, "条数据");
         DownloadHtml(res, myurl, callback);
         // callback(err, myurl + " error happened!");
         return;
@@ -434,6 +408,54 @@ function DownloadHtml(res, myurl, callback) {
       };
       callback(null, result);
     });
+}
+
+//脏数据清洗
+function CleanData() {
+  MongoClient.connect(urldb, function(err, db) {
+    if (err) {
+      throw err;
+    }
+    var dbo = db.db(dbName);
+
+    // 替换户型不符合x室x厅格式的数据字段为“其他”
+    dbo
+      .collection(houseColName)
+      .updateMany(
+        { layout: { $ne: { $regex: /\d室\d厅/ } } },
+        { $set: { layout: "其他" } },
+        function(err, res) {
+          if (err) throw err;
+          console.log(res.result.nModified + " 条文档被更新");
+          // db.close();
+        }
+      );
+
+    // 替换面积小于7的数据字段为7
+    dbo
+      .collection(houseColName)
+      .updateMany({ size: { $lt: 7 } }, { $set: { size: 7 } }, function(
+        err,
+        res
+      ) {
+        if (err) throw err;
+        console.log(res.result.nModified + " 条文档被更新");
+        // db.close();
+      });
+
+    // 替换挂牌价格为Nan的数据为“暂无价格”
+    dbo
+      .collection(houseColName)
+      .updateMany(
+        { listedPrice: NaN },
+        { $set: { listedPrice: "暂无价格" } },
+        function(err, res) {
+          if (err) throw err;
+          console.log(res.result.nModified + " 条文档被更新");
+          // db.close();
+        }
+      );
+  });
 }
 
 module.exports = router;
